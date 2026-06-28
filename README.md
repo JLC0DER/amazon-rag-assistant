@@ -1,57 +1,57 @@
 # Amazon RAG Assistant
 
-Proyecto del bootcamp de ingeniería de IA: pipeline RAG sobre productos de Amazon, API FastAPI, UI Streamlit y evaluación con LangSmith/Ragas.
+A retrieval-augmented generation (RAG) application for Amazon product search. It combines a FastAPI backend, a Streamlit chat UI, Qdrant vector search, and evaluation tooling with LangSmith and Ragas.
 
-## Estructura del proyecto
+## Project structure
 
 ```
 ├── apps/
-│   ├── api/              # FastAPI + RAG pipeline + evals
-│   └── chatbot_ui/       # Streamlit UI
-├── data/demo/            # Dataset demo (15 productos, incluido en git)
-├── docker-compose.yml    # API + UI + Qdrant
-├── pyproject.toml        # Workspace uv (monorepo)
-└── Makefile              # Comandos habituales
+│   ├── api/              # FastAPI backend, RAG pipeline, and evals
+│   └── chatbot_ui/       # Streamlit frontend
+├── data/demo/            # Small demo dataset (tracked in git)
+├── docker-compose.yml    # API, UI, and Qdrant services
+├── pyproject.toml        # uv workspace (monorepo)
+└── Makefile              # Common development commands
 ```
 
-> Los **notebooks** y los **datasets grandes** son locales y no se suben a GitHub (ver `.gitignore`).
+> Large datasets and local notebooks are excluded from version control (see `.gitignore`).
 
-## Requisitos
+## Requirements
 
 - [uv](https://docs.astral.sh/uv/)
 - Docker & Docker Compose
-- API keys: OpenAI (obligatoria para RAG), Groq y Google (opcionales)
+- API keys: OpenAI (required for RAG), Groq and Google (optional)
 
-## Configuración
+## Setup
 
-1. Clona el repositorio e instala dependencias:
+1. Clone the repository and install dependencies:
 
 ```bash
 uv sync
 ```
 
-2. Copia las variables de entorno:
+2. Copy the environment template:
 
 ```bash
 cp .env.example .env
 ```
 
-3. Rellena `.env` con tus API keys.
+3. Fill in your API keys in `.env`.
 
-## Levantar con Docker
+## Run with Docker
 
 ```bash
 make run-docker-compose
 ```
 
-| Servicio | URL |
-|----------|-----|
+| Service | URL |
+|---------|-----|
 | API (FastAPI) | http://localhost:8000 |
 | Swagger UI | http://localhost:8000/docs |
 | Chatbot (Streamlit) | http://localhost:8501 |
 | Qdrant | http://localhost:6333 |
 
-### Probar el RAG
+### Test the RAG endpoint
 
 ```bash
 curl -X POST http://localhost:8000/rag/ \
@@ -59,28 +59,28 @@ curl -X POST http://localhost:8000/rag/ \
   -d '{"query": "USB fan for router"}'
 ```
 
-## Dataset demo
+## Demo dataset
 
-En `data/demo/meta_Electronics_sample.jsonl` hay **15 productos** de ejemplo (~84 KB) para desarrollo sin descargar ficheros de varios GB.
+`data/demo/meta_Electronics_sample.jsonl` contains **15 sample products** (~84 KB) for local development without downloading multi-gigabyte files.
 
-Para el dataset completo, descarga los metadatos de [Amazon Reviews 2023](https://amazon-reviews-2023.github.io/) y colócalos en `data/` (esa carpeta está ignorada por git).
+For the full dataset, download metadata from [Amazon Reviews 2023](https://amazon-reviews-2023.github.io/) and place the files in `data/` (that directory is ignored by git).
 
-## Evaluaciones
+## Evaluations
 
-Con Qdrant en marcha y LangSmith configurado:
+With Qdrant running and LangSmith configured:
 
 ```bash
 make run-evals-retriever
 ```
 
-## Qué no se sube a GitHub
+## Excluded from version control
 
-- `.env` y secretos
+- `.env` and other secrets
 - `.venv/`
-- `data/` (excepto `data/demo/`)
+- `data/` (except `data/demo/`)
 - `qdrant_data/`
-- `notebooks/`
+- local notebooks
 
-## Licencia
+## License
 
-Ver [LICENSE](LICENSE).
+See [LICENSE](LICENSE).
