@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Request
+from qdrant_client import QdrantClient
+
 from api.api.models import RAGRequest, RAGResponse
 from api.agents.retrieval_generation import rag_pipeline
 
@@ -21,7 +23,7 @@ def chat(
     payload: RAGRequest
 ) -> RAGResponse:
 
-    result = rag_pipeline(payload.query)
+    result = rag_pipeline(payload.query, qdrant_client)
 
     return RAGResponse(answer=result["answer"])
 

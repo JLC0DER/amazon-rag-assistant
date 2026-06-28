@@ -2,6 +2,10 @@ run-docker-compose:
 	uv sync
 	docker compose up --build
 
+index-demo:
+	uv sync
+	uv run --env-file .env --directory apps/api python ../../scripts/index_demo.py
+
 clean-notebook-outputs:
 	jupyter nbconvert --clear-output --inplace notebooks/**/*.ipynb
 
