@@ -10,7 +10,7 @@ A retrieval-augmented generation (RAG) application for Amazon product search. It
 │   └── chatbot_ui/       # Streamlit frontend
 ├── data/demo/            # Small demo dataset (tracked in git)
 ├── scripts/
-│   └── index_demo.py     # Optional helper for fresh local setups
+│   └── index_demo.py     # Index demo products into Qdrant
 ├── docker-compose.yml    # API, UI, and Qdrant services
 ├── pyproject.toml        # uv workspace (monorepo)
 └── Makefile              # Common development commands
@@ -22,11 +22,13 @@ A retrieval-augmented generation (RAG) application for Amazon product search. It
 
 - [uv](https://docs.astral.sh/uv/)
 - Docker & Docker Compose
-- API keys: OpenAI (required for RAG), Groq and Google (optional)
+- API keys: **OpenAI** (required for embeddings and chat), Groq and Google (optional)
 
-## Setup
+## Local setup tutorial
 
-1. Clone the repository and install dependencies:
+Follow these steps on a fresh clone to run the project end to end.
+
+### 1. Clone and install dependencies
 
 ```bash
 git clone https://github.com/JLC0DER/amazon-rag-assistant.git
@@ -34,19 +36,29 @@ cd amazon-rag-assistant
 uv sync
 ```
 
-2. Copy the environment template:
+### 2. Configure environment variables
 
 ```bash
 cp .env.example .env
 ```
 
-3. Fill in your API keys in `.env`.
+Edit `.env` and set at least:
 
-## Run with Docker
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `OPENAI_API_KEY` | Yes | Embeddings (`text-embedding-3-small`) and chat completions |
+| `QDRANT_URL` | No | Defaults to `http://localhost:6333` for local scripts |
+| `LANGSMITH_*` | No | Only needed for tracing and evals |
+
+### 3. Start the stack with Docker
+
+From the project root:
 
 ```bash
 make run-docker-compose
 ```
+
+This builds and starts three services:
 
 | Service | URL |
 |---------|-----|
@@ -55,46 +67,84 @@ make run-docker-compose
 | Chatbot (Streamlit) | http://localhost:8501 |
 | Qdrant | http://localhost:6333 |
 
-## Fresh clone setup (optional)
+Wait until the API logs show `Application startup complete`.
 
-If you clone the repository on a new machine and Qdrant is empty, run the standalone indexing helper:
+### 4. Index the demo dataset into Qdrant
+
+On a **new terminal**, still from the project root, run:
 
 ```bash
 make index-demo
 ```
 
-This script only loads the demo dataset into Qdrant. It does **not** modify the application source code.
+Qdrant must already be running (step 3). The script loads the demo file from `data/demo/`, generates embeddings, and stores the products in Qdrant.
 
-What it does:
+> If you already have a populated `qdrant_data/` directory, you can skip this step.
 
-- reads `data/demo/meta_Electronics_sample.jsonl`
-- creates the `Amazon-items-collection-01` collection
-- generates OpenAI embeddings
-- upserts 15 demo products into Qdrant
+#### Run the script manually (without Make)
 
-If you already have a populated `qdrant_data/` directory from your own environment, you can skip this step.
+```bash
+uv run --env-file .env --directory apps/api python ../../scripts/index_demo.py
+```
 
-### Test the RAG endpoint
+### 5. Test the RAG API
 
 ```bash
 curl -X POST http://localhost:8000/rag/ \
   -H "Content-Type: application/json" \
-  -d '{"query": "USB fan for router"}'
+  -d '{"query": "Do you have a USB fan for router?"}'
 ```
+
+Or open [http://localhost:8000/docs](http://localhost:8000/docs), select **POST /rag/**, and send:
+
+```json
+{
+  "query": "Do you have a USB fan for router?"
+}
+```
+
+### 6. Use the chatbot UI
+
+Open [http://localhost:8501](http://localhost:8501) and ask product questions in the chat interface.
+
+## Makefile commands
+
+| Command | What it does |
+|---------|--------------|
+| `make run-docker-compose` | Sync deps and start API, Streamlit, and Qdrant |
+| `make index-demo` | Index the 15-product demo dataset into Qdrant |
+| `make run-evals-retriever` | Run retriever evals (requires LangSmith + Qdrant) |
+| `make clean-notebook-outputs` | Clear Jupyter outputs from local notebooks |
 
 ## Demo dataset
 
-`data/demo/meta_Electronics_sample.jsonl` contains **15 sample products** (~84 KB) for local development without downloading multi-gigabyte files.
+`data/demo/meta_Electronics_sample.jsonl` contains **15 sample Electronics products** (~84 KB) for local development without downloading multi-gigabyte files.
 
-For the full dataset, download metadata from [Amazon Reviews 2023](https://amazon-reviews-2023.github.io/) and place the files in `data/` (that directory is ignored by git).
+The data comes from [Amazon Reviews 2023](https://amazon-reviews-2023.github.io/). For the full dataset, download the metadata from the official source and place the files in `data/` (that directory is ignored by git).
 
 ## Evaluations (optional)
 
-With Qdrant running and LangSmith configured:
+With Qdrant running and LangSmith configured in `.env`:
 
 ```bash
 make run-evals-retriever
 ```
+
+## Citation
+
+This repository uses data provided by the authors of the following paper. If you use this work, please cite:
+
+```bibtex
+@article{hou2024bridging,
+  title={Bridging Language and Items for Retrieval and Recommendation},
+  author={Hou, Yupeng and Li, Jiacheng and He, Zhankui and Yan, An and Chen, Xiusi and McAuley, Julian},
+  journal={arXiv preprint arXiv:2403.03952},
+  year={2024}
+}
+```
+
+Paper: [https://arxiv.org/abs/2403.03952](https://arxiv.org/abs/2403.03952)  
+Dataset: [https://amazon-reviews-2023.github.io/](https://amazon-reviews-2023.github.io/)
 
 ## Excluded from version control
 
