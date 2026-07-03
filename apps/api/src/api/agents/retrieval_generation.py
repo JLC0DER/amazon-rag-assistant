@@ -3,7 +3,8 @@ from qdrant_client import QdrantClient
 from langsmith import traceable, get_current_run_tree
 import instructor
 from pydantic import BaseModel, Field
-from qdrant_client.models import Filter, FieldCondition, MatchValue
+from qdrant_client.models import Filter, FieldCondition, MatchValue, Prefetch, Document
+from qdrant_client import models
 
 class RAGUsedContext(BaseModel):
     id: str = Field(description="ID of the item used to answer the question")
@@ -46,8 +47,23 @@ def retrieve_data(query, qdrant_client, k=5):
     query_embedding = get_embedding(query)
 
     results = qdrant_client.query_points(
-        collection_name="Amazon-items-collection-01",
-        query=query_embedding,
+        collection_name="Amazon-items-collection-01-hybrid-search",
+        prefetch=[
+            Prefetch(
+                query=query_embedding,
+                using="text-embedding-3-small",
+                limit=20
+            ),
+            Prefetch(
+                query=Document(
+                    text=query,
+                    model="qdrant/bm25"
+                ),
+                using="bm25",
+                limit=20
+            )
+        ],
+        query=models.RrfQuery(rrf=models.Rrf(weights=[3,1])),
         limit=k
     )
 
@@ -174,7 +190,7 @@ def rag_pipeline_wraper(question, top_k=5):
 
     for item in result.get("references", []):
         payload = qdrant_client.scroll(
-            collection_name="Amazon-items-collection-01",
+            collection_name="Amazon-items-collection-01-hybrid-search",
             with_payload=True,
             with_vectors=False,
             scroll_filter=Filter(
