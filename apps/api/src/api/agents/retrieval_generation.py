@@ -1,10 +1,14 @@
 import openai
+import cohere
 from qdrant_client import QdrantClient
 from langsmith import traceable, get_current_run_tree
 import instructor
 from pydantic import BaseModel, Field
 from qdrant_client.models import Filter, FieldCondition, MatchValue, Prefetch, Document
 from qdrant_client import models
+
+from api.agents.utils.prompt_management import prompt_template_config
+
 
 class RAGUsedContext(BaseModel):
     id: str = Field(description="ID of the item used to answer the question")
@@ -13,6 +17,7 @@ class RAGUsedContext(BaseModel):
 class RAGGenerationResponse(BaseModel):
     answer: str = Field(description="Answer to the question")
     references: list[RAGUsedContext] = Field(description="List of items used to answer the question")
+
 
 @traceable(
     name="embed_query",
@@ -42,30 +47,38 @@ def get_embedding(text, model="text-embedding-3-small"):
     name="retrieve_data",
     run_type="retriever"
 )
-def retrieve_data(query, qdrant_client, k=5):
+def retrieve_data(query, qdrant_client, k=5, hybrid=True):
 
     query_embedding = get_embedding(query)
 
-    results = qdrant_client.query_points(
-        collection_name="Amazon-items-collection-01-hybrid-search",
-        prefetch=[
-            Prefetch(
-                query=query_embedding,
-                using="text-embedding-3-small",
-                limit=20
-            ),
-            Prefetch(
-                query=Document(
-                    text=query,
-                    model="qdrant/bm25"
+    if hybrid:
+        results = qdrant_client.query_points(
+            collection_name="Amazon-items-collection-01-hybrid-search",
+            prefetch=[
+                Prefetch(
+                    query=query_embedding,
+                    using="text-embedding-3-small",
+                    limit=20
                 ),
-                using="bm25",
-                limit=20
-            )
-        ],
-        query=models.RrfQuery(rrf=models.Rrf(weights=[3,1])),
-        limit=k
-    )
+                Prefetch(
+                    query=Document(
+                        text=query,
+                        model="qdrant/bm25"
+                    ),
+                    using="bm25",
+                    limit=20
+                )
+            ],
+            query=models.RrfQuery(rrf=models.Rrf(weights=[3,1])),
+            limit=k
+        )
+    else:
+        results = qdrant_client.query_points(
+            collection_name="Amazon-items-collection-01-hybrid-search",
+            query=query_embedding,
+            using="text-embedding-3-small",
+            limit=k
+        )
 
     retrieved_context_ids = []
     retrieved_context = []
@@ -83,6 +96,45 @@ def retrieve_data(query, qdrant_client, k=5):
         "retrieved_context": retrieved_context,
         "similarity_scores": similarity_scores,
         "retrieved_context_ratings": retrieved_context_ratings
+    }
+
+
+@traceable(
+    name="rerank_data",
+    run_type="tool"
+)
+def rerank_data(query, context, top_k=5, max_retries=5):
+
+    import time
+    from cohere.errors import TooManyRequestsError
+
+    cohere_client = cohere.ClientV2()
+    last_error = None
+
+    for attempt in range(max_retries):
+        try:
+            response = cohere_client.rerank(
+                model="rerank-v4.0-pro",
+                query=query,
+                documents=context["retrieved_context"],
+                top_n=top_k
+            )
+            break
+        except TooManyRequestsError as exc:
+            last_error = exc
+            # Trial keys are limited to ~10 calls/minute.
+            sleep_seconds = 7 * (attempt + 1)
+            time.sleep(sleep_seconds)
+    else:
+        raise last_error
+
+    order = [result.index for result in response.results]
+
+    return {
+        "retrieved_context_ids": [context["retrieved_context_ids"][i] for i in order],
+        "retrieved_context": [context["retrieved_context"][i] for i in order],
+        "similarity_scores": [context["similarity_scores"][i] for i in order],
+        "retrieved_context_ratings": [context["retrieved_context_ratings"][i] for i in order]
     }
 
 
@@ -106,22 +158,12 @@ def process_context(context):
 )
 def build_prompt(preprocessed_context, question):
 
-    prompt = f"""
-You are a shopping assistant that can answer questions about the products in stock.
+    template = prompt_template_config("retrieval_generation.yaml", "retrieval_generation")
 
-You will be given a question and a list of context.
-
-Instructions:
-- Answer the question based on the provided context only.
-- Never use word context and refer to it as the available products.
-- Do not use markdown formatting.
-
-Context:
-{preprocessed_context}
-
-Question:
-{question}    
-"""
+    prompt = template.render(
+        context=preprocessed_context,
+        question=question
+    )
 
     return prompt
 
@@ -163,9 +205,18 @@ def generate_answer(prompt):
 @traceable(
     name="rag_pipeline",
 )
-def rag_pipeline(question, qdrant_client, top_k=5):
+def rag_pipeline(question, qdrant_client, top_k=5, hybrid=True, rerank=False, retrieve_k=20):
 
-    retrieved_context = retrieve_data(question, qdrant_client, k=top_k)
+    retrieved_context = retrieve_data(
+        question,
+        qdrant_client,
+        k=retrieve_k if rerank else top_k,
+        hybrid=hybrid
+    )
+
+    if rerank:
+        retrieved_context = rerank_data(question, retrieved_context, top_k=top_k)
+
     preprocessed_context = process_context(retrieved_context)
     prompt = build_prompt(preprocessed_context, question)
     answer = generate_answer(prompt)
@@ -179,6 +230,7 @@ def rag_pipeline(question, qdrant_client, top_k=5):
     }
 
     return final_answer
+
 
 def rag_pipeline_wraper(question, top_k=5):
 
@@ -210,10 +262,10 @@ def rag_pipeline_wraper(question, top_k=5):
                     "image_url": image_url,
                     "price": price,
                     "description": item.description
-                   
                 }
             )
-    return{
+
+    return {
         "answer": result["answer"],
         "used_context": used_context
     }
