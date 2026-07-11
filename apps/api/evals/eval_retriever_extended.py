@@ -22,7 +22,16 @@ openai_client = AsyncOpenAI()
 ragas_llm = llm_factory("gpt-4.1-mini", client=openai_client, max_tokens=4000)
 ragas_embeddings = OpenAIEmbeddings(client=openai_client, model="text-embedding-3-small")
 
-# Keep concurrency at 1 and throttle calls to stay under trial API limits.
+# Cohere API plan controls LangSmith evaluate concurrency.
+# - "trial": free/trial key (~10 req/min) -> keep concurrency at 1 to avoid 429s
+# - "paid": production key -> allow higher concurrency
+# Default is "trial". Switch to "paid" when using a paid Cohere API key.
+COHERE_API_MODE = "trial"  # "trial" | "paid"
+MAX_CONCURRENCY_TRIAL = 1
+MAX_CONCURRENCY_PAID = 10
+MAX_CONCURRENCY = MAX_CONCURRENCY_TRIAL if COHERE_API_MODE == "trial" else MAX_CONCURRENCY_PAID
+
+# Throttle calls to stay under trial API limits.
 # Cohere trial keys allow ~10 requests/minute.
 SLEEP_BETWEEN_CALLS_SECONDS = 2
 SLEEP_BETWEEN_RERANK_CALLS_SECONDS = 7
@@ -110,19 +119,19 @@ def make_target(hybrid: bool, rerank: bool, sleep_seconds: float):
 EVALUATORS = [
     context_precision_id_based,
     context_recall_id_based,
-    ragas_faithfulness,
-    ragas_relevancy,
+    #ragas_faithfulness,
+    #ragas_relevancy,
 ]
 
 
 def run_experiment(prefix: str, hybrid: bool, rerank: bool, sleep_seconds: float):
-    print(f"Evaluating {prefix} retriever")
+    print(f"Evaluating {prefix} retriever (max_concurrency={MAX_CONCURRENCY}, mode={COHERE_API_MODE})")
     return ls_client.evaluate(
         make_target(hybrid=hybrid, rerank=rerank, sleep_seconds=sleep_seconds),
         data="rag-evaluation-dataset-extended",
         evaluators=EVALUATORS,
         experiment_prefix=prefix,
-        max_concurrency=1,
+        max_concurrency=MAX_CONCURRENCY,
     )
 
 

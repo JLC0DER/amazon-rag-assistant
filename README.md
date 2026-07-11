@@ -22,7 +22,7 @@ A retrieval-augmented generation (RAG) application for Amazon product search. It
 
 - [uv](https://docs.astral.sh/uv/)
 - Docker & Docker Compose
-- API keys: **OpenAI** (required for embeddings and chat), Groq and Google (optional)
+- API keys: **OpenAI** (required for embeddings and chat), **Cohere** (optional, for reranking), Groq and Google (optional)
 
 ## Local setup tutorial
 
@@ -47,6 +47,7 @@ Edit `.env` and set at least:
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `OPENAI_API_KEY` | Yes | Embeddings (`text-embedding-3-small`) and chat completions |
+| `CO_API_KEY` | No | Cohere reranking (needed for hybrid+rerank evals) |
 | `QDRANT_URL` | No | Defaults to `http://localhost:6333` for local scripts |
 | `LANGSMITH_*` | No | Only needed for tracing and evals |
 
@@ -113,7 +114,8 @@ Open [http://localhost:8501](http://localhost:8501) and ask product questions in
 |---------|--------------|
 | `make run-docker-compose` | Sync deps and start API, Streamlit, and Qdrant |
 | `make index-demo` | Index the 15-product demo dataset into Qdrant |
-| `make run-evals-retriever` | Run retriever evals (requires LangSmith + Qdrant) |
+| `make run-evals-retriever` | Run baseline retriever evals (requires LangSmith + Qdrant) |
+| `make run-evals-retriever-extended` | Run plain / hybrid / hybrid+rerank eval experiments |
 | `make clean-notebook-outputs` | Clear Jupyter outputs from local notebooks |
 
 ## Demo dataset
@@ -129,6 +131,30 @@ With Qdrant running and LangSmith configured in `.env`:
 ```bash
 make run-evals-retriever
 ```
+
+### Extended retrieval experiments
+
+Compare plain retrieval, hybrid search, and hybrid + Cohere reranking:
+
+```bash
+make run-evals-retriever-extended
+```
+
+Concurrency depends on your Cohere plan. In `apps/api/evals/eval_retriever_extended.py`:
+
+```python
+# Default is "trial". Switch to "paid" when using a paid Cohere API key.
+COHERE_API_MODE = "trial"  # "trial" | "paid"
+MAX_CONCURRENCY_TRIAL = 1
+MAX_CONCURRENCY_PAID = 10
+```
+
+| Mode | `COHERE_API_MODE` | `max_concurrency` | When to use |
+|------|-------------------|-------------------|-------------|
+| Trial (default) | `"trial"` | `1` | Free/trial Cohere key (~10 req/min); avoids `429` |
+| Paid | `"paid"` | `10` | Production Cohere key with higher rate limits |
+
+The script also adds short sleeps between examples and retries Cohere `429` responses. That only slows the run; it does not change evaluation scores.
 
 ## Citation
 
