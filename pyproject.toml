@@ -1,13 +1,16 @@
 [project]
-name = "ai-bootcamp"
+name = "shop-assistant"
 version = "0.1.0"
-description = "Add your description here"
+description = "ShopAssistant — RAG shopping assistant for Amazon product search"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "api",
+    "chatbot-ui",
     "google-genai>=2.9.0",
     "groq>=1.4.0",
     "ipykernel>=7.3.0",
+    "langchain-mcp-adapters>=0.3.0",
     "openai>=2.43.0",
     "pydantic>=2.13.4",
     "pydantic-settings>=2.14.2",
@@ -19,15 +22,28 @@ dependencies = [
 members = [
     "apps/api",
     "apps/chatbot_ui",
+    "apps/items_mcp_server",
+    "apps/reviews_mcp_server",
 ]
+
+[tool.uv.sources]
+api = { workspace = true }
+chatbot-ui = { workspace = true }
 
 [dependency-groups]
 dev = [
+    "cohere>=7.0.5",
+    "instructor>=1.15.3",
     "langchain-community>=0.4.0,<0.4.2",
     "langchain-google-vertexai>=3.2.4",
     "langchain-openai>=1.1.9",
+    "langgraph>=1.2.2",
+    "langgraph-checkpoint-postgres>=3.1.0",
+    "psycopg[binary]>=3.3.4",
     "langsmith>=0.9.2",
     "matplotlib>=3.11.0",
     "qdrant-client>=1.18.0",
     "ragas>=0.4.3",
+    "fastmcp>=3.4.4",
+    "langchain-mcp-adapters>=0.3.0",
 ]

@@ -1,7 +1,25 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import Optional, Union
 
-class RAGRequest(BaseModel):
+class AgentRequest(BaseModel):
     query: str
+    thread_id: str
 
-class RAGResponse(BaseModel):
+class RAGUsedContext(BaseModel):
+    image_url: str
+    price: Optional[float] = None
+    description: str
+
+class AgentResponse(BaseModel):
     answer: str
+    used_context: list[RAGUsedContext]
+    trace_id: str
+
+class FeedbackRequest(BaseModel):
+    trace_id: str
+    feedback_score: Union[int, None] = Field(description="Feedback score, 0 to 1.")
+    feedback_text: str = Field(description="Feedback text.")
+    feedback_source_type: str = Field(description="Feedback source type, 'api' or 'user'.")
+
+class FeedbackResponse(BaseModel):
+    message: str = Field(description="Feedback submission message.")

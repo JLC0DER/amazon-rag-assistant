@@ -12,3 +12,7 @@ clean-notebook-outputs:
 run-evals-retriever:
 	uv sync
 	PYTHONPATH="$(CURDIR)/apps/api:$(CURDIR)/apps/api/src:$$PYTHONPATH" uv run --env-file .env python -m evals.eval_retriever
+
+run-evals-retriever-extended:
+	uv sync
+	PYTHONPATH="$(CURDIR)/apps/api:$(CURDIR)/apps/api/src:$$PYTHONPATH" uv run --env-file .env python -m evals.eval_retriever_extended

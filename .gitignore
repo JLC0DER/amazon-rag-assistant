@@ -214,8 +214,9 @@ mlruns/
 *.csv
 *.parquet
 
-# Bootcamp notebooks (local work)
-notebooks/
+# Local notebooks — only the unified data-modeling notebook is tracked
+notebooks/**
+!notebooks/data-modeling-qdrant.ipynb
 
 # Local datasets (large Amazon review files)
 *.jsonl
@@ -230,6 +231,9 @@ data/**
 
 # Vector database (regenerated locally)
 qdrant_data/
+
+# Postgres checkpoint data (local LangGraph state)
+postgres_data/
 
 # Node (if used for frontend or tooling)
 node_modules/
