@@ -5,9 +5,12 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "api",
+    "chatbot-ui",
     "google-genai>=2.9.0",
     "groq>=1.4.0",
     "ipykernel>=7.3.0",
+    "langchain-mcp-adapters>=0.3.0",
     "openai>=2.43.0",
     "pydantic>=2.13.4",
     "pydantic-settings>=2.14.2",
@@ -19,7 +22,13 @@ dependencies = [
 members = [
     "apps/api",
     "apps/chatbot_ui",
+    "apps/items_mcp_server",
+    "apps/reviews_mcp_server",
 ]
+
+[tool.uv.sources]
+api = { workspace = true }
+chatbot-ui = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -35,4 +44,6 @@ dev = [
     "matplotlib>=3.11.0",
     "qdrant-client>=1.18.0",
     "ragas>=0.4.3",
+    "fastmcp>=3.4.4",
+    "langchain-mcp-adapters>=0.3.0",
 ]

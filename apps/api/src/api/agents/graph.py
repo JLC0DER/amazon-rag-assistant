@@ -81,65 +81,6 @@ graph = workflow.compile()
 
 ### Agent Execution
 
-def _build_used_context(result: dict) -> list[dict]:
-    qdrant_client = QdrantClient(url="http://qdrant:6333")
-    used_context = []
-
-    for item in result.get("references", []):
-        item_id = item.get("id") if isinstance(item, dict) else item.id
-        description = item.get("description") if isinstance(item, dict) else item.description
-
-        payload = qdrant_client.scroll(
-            collection_name="Amazon-items-collection-01-hybrid-search",
-            with_payload=True,
-            with_vectors=False,
-            scroll_filter=Filter(
-                must=[
-                    FieldCondition(
-                        key="parent_asin",
-                        match=MatchValue(value=item_id)
-                    )
-                ]
-            )
-        )[0][0].payload
-        image_url = payload.get("image", "")
-        price = payload.get("price")
-        if image_url:
-            used_context.append(
-                {
-                    "image_url": image_url,
-                    "price": price,
-                    "description": description
-                }
-            )
-
-    return used_context
-
-
-def agent_wrapper(question: str, thread_id: str) -> dict:
-    initial_state = {
-        "messages": [HumanMessage(content=question)],
-        "iteration": 0,
-    }
-    config = {
-        "configurable": {
-            "thread_id": thread_id
-        }
-    }
-
-    with PostgresSaver.from_conn_string(
-        "postgresql://langgraph_user:langgraph_password@postgres:5432/langgraph_db"
-    ) as checkpointer:
-        compiled_graph = workflow.compile(checkpointer=checkpointer)
-        result = compiled_graph.invoke(initial_state, config=config)
-
-    return {
-        "answer": result.get("answer", ""),
-        "used_context": _build_used_context(result),
-        "trace_id": result.get("trace_id", ""),
-    }
-
-
 def agent_stream_wrapper(question: str, thread_id: str) -> dict:
 
     def _string_for_sse(string):
@@ -164,6 +105,8 @@ def agent_stream_wrapper(question: str, thread_id: str) -> dict:
             if chunk[1].get("payload", {}).get("name") == "tool_node":
                 message = " ".join([_tool_to_text(tool_call) for tool_call in chunk[1].get('payload', {}).get('input', {}).messages[-1].tool_calls])
                 return message
+
+    qdrant_client = QdrantClient(url="http://qdrant:6333")
 
     initial_state = {
         "messages": [HumanMessage(content=question)],
@@ -197,12 +140,51 @@ def agent_stream_wrapper(question: str, thread_id: str) -> dict:
             if chunk[0] == "values":
                 result = chunk[1]
 
+    used_context = []
+    seen_ids: set[str] = set()
+
+    for item in result.get("references", []):
+        item_id = item.get("id") if isinstance(item, dict) else item.id
+        description = item.get("description") if isinstance(item, dict) else item.description
+
+        if not item_id or item_id in seen_ids:
+            continue
+
+        points, _ = qdrant_client.scroll(
+            collection_name="Amazon-items-collection-01-hybrid-search",
+            with_payload=True,
+            with_vectors=False,
+            scroll_filter=Filter(
+                must=[
+                    FieldCondition(
+                        key="parent_asin",
+                        match=MatchValue(value=item_id)
+                    )
+                ]
+            )
+        )
+        if not points:
+            continue
+
+        payload = points[0].payload or {}
+        image_url = payload.get("image", "")
+        price = payload.get("price")
+        if image_url:
+            seen_ids.add(item_id)
+            used_context.append(
+                {
+                    "image_url": image_url,
+                    "price": price,
+                    "description": description
+                }
+            )
+
     yield _string_for_sse(json.dumps(
         {
             "type": "final_answer",
             "data": {
                 "answer": result.get("answer", ""),
-                "used_context": _build_used_context(result),
+                "used_context": used_context,
                 "trace_id": result.get("trace_id", "")
             }
         }
