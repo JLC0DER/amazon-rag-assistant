@@ -6,7 +6,7 @@ import json
 
 
 st.set_page_config(
-    page_title="Ecommerce Assistant",
+    page_title="ShopAssistant",
     layout="wide",
     initial_sidebar_state="expanded"
 )

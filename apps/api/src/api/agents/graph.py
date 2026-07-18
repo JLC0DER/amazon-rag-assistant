@@ -10,6 +10,7 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import Filter, FieldCondition, MatchValue
 from langgraph.checkpoint.postgres import PostgresSaver
 import json
+import os
 
 
 class State(BaseModel):
@@ -118,9 +119,8 @@ def agent_stream_wrapper(question: str, thread_id: str) -> dict:
         }
     }
 
-    with PostgresSaver.from_conn_string(
-        "postgresql://langgraph_user:langgraph_password@postgres:5432/langgraph_db"
-    ) as checkpointer:
+    postgres_uri = os.environ["POSTGRES_URI"]
+    with PostgresSaver.from_conn_string(postgres_uri) as checkpointer:
 
         graph = workflow.compile(
             checkpointer=checkpointer

@@ -1,6 +1,6 @@
 # Demo dataset
 
-Subset of **15 Amazon Electronics products** extracted from the bootcamp preprocessing pipeline.
+Subset of **15 Amazon Electronics products** extracted from the ShopAssistant preprocessing pipeline.
 
 - **File:** `meta_Electronics_sample.jsonl`
 - **Format:** JSONL (one JSON object per line)

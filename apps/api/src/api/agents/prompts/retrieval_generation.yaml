@@ -1,7 +1,7 @@
 metadata:
   name: retrieval-generation
   description: Retrieval-Generation Prompt for a RAG Pipeline
-  author: Josh Sohn
+  author: Jose Luis Sanchez
   version: 1.0.0
   created: 2026-07-03
   updated: 2026-07-03

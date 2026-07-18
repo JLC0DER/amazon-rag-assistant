@@ -214,8 +214,9 @@ mlruns/
 *.csv
 *.parquet
 
-# Bootcamp notebooks (local work)
-notebooks/
+# Local notebooks — only the unified data-modeling notebook is tracked
+notebooks/**
+!notebooks/data-modeling-qdrant.ipynb
 
 # Local datasets (large Amazon review files)
 *.jsonl
