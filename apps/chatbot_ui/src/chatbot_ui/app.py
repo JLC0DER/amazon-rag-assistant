@@ -1,12 +1,21 @@
 import streamlit as st
 import requests
 from chatbot_ui.core.config import config
+import uuid
 
 st.set_page_config(
     page_title="Ecommerce Assistant",
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+def get_session_id():
+    if "session_id" not in st.session_state:
+        st.session_state.session_id = str(uuid.uuid4())
+    return st.session_state.session_id
+
+thread_id = get_session_id()
+
 
 def api_call(method, url, **kwargs):
     def _show_error_popup(message):
@@ -46,6 +55,9 @@ if "messages" not in st.session_state:
 if "used_context" not in st.session_state:
     st.session_state.used_context = []
 
+if "thread_id" not in st.session_state:
+    st.session_state.thread_id = thread_id
+
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
@@ -73,14 +85,17 @@ if prompt := st.chat_input("Hello! How can I assist you today?"):
 
     with st.chat_message("assistant"):
 
-        state, output = api_call("post", f"{config.API_URL}/agent", json={"query": prompt})
+        state, output = api_call("post", f"{config.API_URL}/agent", json={"query": prompt, "thread_id": st.session_state.thread_id})
 
-        answer = output["answer"]
-        used_context = output["used_context"]
-
-        st.session_state.used_context = used_context
-        
-        st.write(answer)
+        if not state:
+            answer = output.get("detail") or output.get("message") or "Something went wrong. Please try again."
+            used_context = st.session_state.used_context
+            st.error(answer)
+        else:
+            answer = output.get("answer", "")
+            used_context = output.get("used_context", [])
+            st.session_state.used_context = used_context
+            st.write(answer)
 
     st.session_state.messages.append({"role": "assistant", "content": answer})
     st.rerun()
