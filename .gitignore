@@ -231,6 +231,9 @@ data/**
 # Vector database (regenerated locally)
 qdrant_data/
 
+# Postgres checkpoint data (local LangGraph state)
+postgres_data/
+
 # Node (if used for frontend or tooling)
 node_modules/
 npm-debug.log*
